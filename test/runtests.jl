@@ -10,13 +10,13 @@ using Statistics
 using Test
 
 # For testing purposes we use a lot of
-using ChainRulesCore: add, cast, extern, accumulate, accumulate!, store!, @scalar_rule,
-    Wirtinger, wirtinger_primal, wirtinger_conjugate, add_wirtinger, mul_wirtinger,
-    Zero, add_zero, mul_zero, One, add_one, mul_one, Casted, cast, add_casted, mul_casted,
-    DNE, Thunk, Casted, DNERule
+using ChainRulesCore: cast, extern, accumulate, accumulate!, store!, @scalar_rule,
+    Wirtinger, wirtinger_primal, wirtinger_conjugate,
+    Zero, One, Casted, DNE, Thunk, DNERule, AbstractDifferential
 
 include("test_util.jl")
 
+println("Testing ChainRules.jl")
 @testset "ChainRules" begin
     include("helper_functions.jl")
     @testset "rulesets" begin
@@ -27,9 +27,13 @@ include("test_util.jl")
             include(joinpath("rulesets", "Base", "broadcast.jl"))
         end
 
+        print(" ")
+
         @testset "Statistics" begin
             include(joinpath("rulesets", "Statistics", "statistics.jl"))
         end
+
+        print(" ")
 
         @testset "LinearAlgebra" begin
             include(joinpath("rulesets", "LinearAlgebra", "dense.jl"))
@@ -37,6 +41,8 @@ include("test_util.jl")
             include(joinpath("rulesets", "LinearAlgebra", "factorization.jl"))
             include(joinpath("rulesets", "LinearAlgebra", "blas.jl"))
         end
+
+        print(" ")
 
         @testset "packages" begin
             include(joinpath("rulesets", "packages", "NaNMath.jl"))

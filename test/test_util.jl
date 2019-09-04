@@ -1,13 +1,62 @@
+using FiniteDifferences, Test
 using FiniteDifferences: jvp, j′vp
+using ChainRules
+using ChainRulesCore: AbstractDifferential
 
 const _fdm = central_fdm(5, 1)
+
+"""
+    test_scalar(f, x; rtol=1e-9, atol=1e-9, fdm=central_fdm(5, 1), test_wirtinger=x isa Complex, kwargs...)
+
+Given a function `f` with scalar input an scalar output, perform finite differencing checks,
+at input point `x` to confirm that there are correct ChainRules provided.
+
+# Arguments
+- `f`: Function for which the `frule` and `rrule` should be tested.
+- `x`: input at which to evaluate `f` (should generally be set to an arbitary point in the domain).
+
+- `test_wirtinger`: test whether the wirtinger derivative is correct, too
+
+All keyword arguments except for `fdm` and `test_wirtinger` are passed to `isapprox`.
+"""
+function test_scalar(f, x; rtol=1e-9, atol=1e-9, fdm=_fdm, test_wirtinger=x isa Complex, kwargs...)
+    @testset "$f at $x, $(nameof(rule))" for rule in (rrule, frule)
+        res = rule(f, x)
+        @test res !== nothing  # Check the rule was defined
+        fx, ∂x = res
+        @test fx == f(x)  # Check we still get the normal value, right
+
+        # Check that we get the derivative right:
+        if !test_wirtinger
+            @test isapprox(
+                ∂x(1), fdm(f, x);
+                rtol=rtol, atol=atol, kwargs...
+            )
+        else
+            # For complex arguments, also check if the wirtinger derivative is correct
+            ∂Re = fdm(ϵ -> f(x + ϵ), 0)
+            ∂Im = fdm(ϵ -> f(x + im*ϵ), 0)
+            ∂ = 0.5(∂Re - im*∂Im)
+            ∂̅ = 0.5(∂Re + im*∂Im)
+            @test isapprox(
+                wirtinger_primal(∂x(1)), ∂;
+                rtol=rtol, atol=atol, kwargs...
+            )
+            @test isapprox(
+                wirtinger_conjugate(∂x(1)), ∂̅;
+                rtol=rtol, atol=atol, kwargs...
+            )
+        end
+    end
+end
+
 
 """
     frule_test(f, (x, ẋ)...; rtol=1e-9, atol=1e-9, fdm=central_fdm(5, 1), kwargs...)
 
 # Arguments
 - `f`: Function for which the `frule` should be tested.
-- `x`: input at which to evaluate `f` (should generally be set randomly).
+- `x`: input at which to evaluate `f` (should generally be set to an arbitary point in the domain).
 - `ẋ`: differential w.r.t. `x` (should generally be set randomly).
 
 All keyword arguments except for `fdm` are passed to `isapprox`.
@@ -31,7 +80,7 @@ end
 # Arguments
 - `f`: Function to which rule should be applied.
 - `ȳ`: adjoint w.r.t. output of `f` (should generally be set randomly).
-- `x`: input at which to evaluate `f` (should generally be set randomly).
+- `x`: input at which to evaluate `f` (should generally be set to an arbitary point in the domain).
 - `x̄`: currently accumulated adjoint (should generally be set randomly).
 
 All keyword arguments except for `fdm` are passed to `isapprox`.
@@ -114,12 +163,12 @@ end
 function Base.isapprox(d_ad::DNE, d_fd; kwargs...)
     error("Tried to differentiate w.r.t. a DNE")
 end
-function Base.isapprox(d_ad::Thunk, d_fd; kwargs...)
+function Base.isapprox(d_ad::AbstractDifferential, d_fd; kwargs...)
     return isapprox(extern(d_ad), d_fd; kwargs...)
 end
 
 function test_accumulation(x̄, dx, ȳ, partial)
-    @test all(extern(add(x̄, partial)) .≈ extern(x̄) .+ extern(partial))
+    @test all(extern(x̄ + partial) .≈ extern(x̄) .+ extern(partial))
     test_accumulate(x̄, dx, ȳ, partial)
     test_accumulate!(x̄, dx, ȳ, partial)
     test_store!(x̄, dx, ȳ, partial)
