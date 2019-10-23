@@ -35,7 +35,7 @@ function test_scalar(f, x; rtol=1e-9, atol=1e-9, fdm=_fdm, test_wirtinger=x isa 
         else # rule == frule
             # Got to input extra first aguement for internals
             # But it is only a dummy since this is not a functor
-            ∂x, = prop_rule(NamedTuple(), 1)
+            ∂x = prop_rule(NamedTuple(), 1)
         end
 
 
@@ -193,12 +193,11 @@ end
 function Base.isapprox(ad::Wirtinger, fd; kwargs...)
     error("Finite differencing with Wirtinger rules not implemented")
 end
-function Base.isapprox(d_ad::Casted, d_fd; kwargs...)
-    return all(isapprox.(extern(d_ad), d_fd; kwargs...))
-end
+
 function Base.isapprox(d_ad::DNE, d_fd; kwargs...)
     error("Tried to differentiate w.r.t. a DNE")
 end
+
 function Base.isapprox(d_ad::AbstractDifferential, d_fd; kwargs...)
     return isapprox(extern(d_ad), d_fd; kwargs...)
 end
