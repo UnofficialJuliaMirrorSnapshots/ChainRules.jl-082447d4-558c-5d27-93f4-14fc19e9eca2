@@ -12,7 +12,9 @@ using Test
 # For testing purposes we use a lot of
 using ChainRulesCore: extern, accumulate, accumulate!, store!, @scalar_rule,
     Wirtinger, wirtinger_primal, wirtinger_conjugate,
-    Zero, One, DNE, Thunk, AbstractDifferential
+    Zero, One, DoesNotExist, Thunk, AbstractDifferential
+
+Random.seed!(1) # Set seed that all testsets should reset to.
 
 include("test_util.jl")
 
@@ -20,6 +22,7 @@ println("Testing ChainRules.jl")
 @testset "ChainRules" begin
     include("helper_functions.jl")
     @testset "rulesets" begin
+
         @testset "Base" begin
             include(joinpath("rulesets", "Base", "base.jl"))
             include(joinpath("rulesets", "Base", "array.jl"))

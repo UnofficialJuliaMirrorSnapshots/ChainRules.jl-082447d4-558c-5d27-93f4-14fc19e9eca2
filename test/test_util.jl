@@ -98,7 +98,13 @@ function frule_test(f, xẋs::Tuple{Any, Any}...; rtol=1e-9, atol=1e-9, fdm=_fdm
 
     # Correctness testing via finite differencing.
     dΩ_fd = jvp(fdm, xs->f(xs...), (xs, ẋs))
-    @test isapprox(dΩ_ad, dΩ_fd; rtol=rtol, atol=atol, kwargs...)
+    @test isapprox(
+        collect(dΩ_ad),  # Use collect so can use vector equality
+        collect(dΩ_fd);
+        rtol=rtol,
+        atol=atol,
+        kwargs...
+    )
 end
 
 
@@ -108,6 +114,7 @@ end
 # Arguments
 - `f`: Function to which rule should be applied.
 - `ȳ`: adjoint w.r.t. output of `f` (should generally be set randomly).
+  Should be same structure as `f(x)` (so if multiple returns should be a tuple)
 - `x`: input at which to evaluate `f` (should generally be set to an arbitary point in the domain).
 - `x̄`: currently accumulated adjoint (should generally be set randomly).
 
@@ -118,8 +125,15 @@ function rrule_test(f, ȳ, (x, x̄)::Tuple{Any, Any}; rtol=1e-9, atol=1e-9, fdm
 
     # Check correctness of evaluation.
     fx, pullback = ChainRules.rrule(f, x)
-    @test fx ≈ f(x)
-    (∂self, x̄_ad) = pullback(ȳ)
+    @test collect(fx) ≈ collect(f(x))  # use collect so can do vector equality
+    (∂self, x̄_ad) = if fx isa Tuple
+        # If the function returned multiple values,
+        # then it must have multiple seeds for propagating backwards
+        pullback(ȳ...)
+    else
+        pullback(ȳ)
+    end
+
     @test ∂self === NO_FIELDS  # No internal fields
     # Correctness testing via finite differencing.
     x̄_fd = j′vp(fdm, f, ȳ, x)
@@ -175,8 +189,8 @@ function rrule_test(f, ȳ, xx̄s::Tuple{Any, Any}...; rtol=1e-9, atol=1e-9, fdm
     x̄s_fd = _make_fdm_call(fdm, f, ȳ, xs, x̄s .== nothing)
     for (x̄_ad, x̄_fd) in zip(x̄s_ad, x̄s_fd)
         if x̄_fd === nothing
-            # The way we've structured the above, this tests that the rule is a DNERule
-            @test x̄_ad isa DNE
+            # The way we've structured the above, this tests that the rule is a DoesNotExistRule
+            @test x̄_ad isa DoesNotExist
         else
             @test isapprox(x̄_ad, x̄_fd; rtol=rtol, atol=atol, kwargs...)
         end
@@ -194,8 +208,8 @@ function Base.isapprox(ad::Wirtinger, fd; kwargs...)
     error("Finite differencing with Wirtinger rules not implemented")
 end
 
-function Base.isapprox(d_ad::DNE, d_fd; kwargs...)
-    error("Tried to differentiate w.r.t. a DNE")
+function Base.isapprox(d_ad::DoesNotExist, d_fd; kwargs...)
+    error("Tried to differentiate w.r.t. a `DoesNotExist`")
 end
 
 function Base.isapprox(d_ad::AbstractDifferential, d_fd; kwargs...)
